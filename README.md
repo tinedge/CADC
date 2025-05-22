@@ -101,14 +101,14 @@ For small scale scenario, open a new terminal and run the command:
 
 ```shell
 cd ./scratch
-python3 CADC_Agent_small.py
+python3 CADC_Small.py
 ```
 
 For large scale scenario, open a new terminal and run the command:
 
 ```shell
 cd ./scratch
-python3 CADC_Agent_large.py
+python3 CADC_Large.py
 ```
 
 Contact
