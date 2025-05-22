@@ -96,6 +96,9 @@ namespace ns3 {
             std::map < uint16_t,
             std::map < uint16_t,
             float > > UserThrouput;
+
+            std::map<uint64_t, std::vector<double>> old_position_ues;
+            std::map<uint64_t, std::vector<double>> position_ues;
             
             std::map<uint32_t, Ptr<LteEnbNetDevice> > m_enbs;
             std::map<uint64_t, Ptr<LteUeNetDevice>> m_ues;

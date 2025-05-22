@@ -63,8 +63,37 @@ def action_func_coordinator(actions):
         actions = int(actions/4)
     
     return env_actions_coordinator
+
+def action_func_coordinator_cluster(actions, cluster_list):
+    env_actions_coordinator = []
+
+    for i in range(5):
+        env_actions_coordinator.append(0)
+
+    idx_cluster = 0
+    for i in cluster_list:
+        action = actions[idx_cluster]
+        for j in i:
+            action = actions[idx_cluster]
+            env_actions_coordinator[j] = action % 4
+            action = int(action/4)
+        idx_cluster = idx_cluster + 1
+
+    return env_actions_coordinator
 #################################################################################
 ######################################################################################################################################################
+def jains_index(allocations):
+
+    if len(allocations) == 0:
+        return 0 
+
+    sum_allocations = sum(allocations)
+    sum_squared_allocations = sum(x**2 for x in allocations)
+    n = len(allocations)
+    
+    jain_index = (sum_allocations ** 2) / (n * sum_squared_allocations)
+    return jain_index
+
 
 ######################################################################################################################################################
 # Sum Tree Class #####################################################################################################################################
@@ -299,7 +328,6 @@ class DDQNAgent:
         loss = (weights * F.mse_loss(current_q, expected_q)).mean()
 
         self.loss = loss
-        print("Model Loss: ",float(loss.item()))
 
         self.optimizer.zero_grad()
         loss.backward()
@@ -318,6 +346,7 @@ seed=3
 simArgs = {}
 debug=True
 
+
 if __name__ == "__main__" :
 
     env = ns3env.Ns3Env(port=port, stepTime=stepTime, startSim=startSim, simSeed=seed, simArgs=simArgs, debug=debug)
@@ -328,8 +357,23 @@ if __name__ == "__main__" :
     ObsSpace_Mlb = 36
     ActSpace_Mlb = 9
 
+    # Cluster
+    cluster_list = [ [0], [1], [2,3,4] ]
+
     state_size = 30
     action_size = 4**5
+
+    # Cluster 1 (BS 1)
+    C1_state_size = 6
+    C1_action_size = 4
+
+    # Cluster 2 (BS 2)
+    C2_state_size = 6
+    C2_action_size = 4
+
+    # Cluster 3 (BS 3, 4, 5)
+    C3_state_size = 18
+    C3_action_size = 4**3
 
     done = False
     batch_size = 64 
@@ -344,19 +388,24 @@ if __name__ == "__main__" :
     actions_Mlb_previous = [0] * 5
 
     # Q-table for MRO
-    Q1_Mro = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable1_QMRO_Mid.csv"))
-    Q2_Mro = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable2_QMRO_Mid.csv"))
-    Q3_Mro = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable3_QMRO_Mid.csv"))
-    Q4_Mro = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable4_QMRO_Mid.csv"))
-    Q5_Mro = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable5_QMRO_Mid.csv"))
+    Q1_Mro = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable1_QMRO_Mid.csv"))
+    Q2_Mro = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable2_QMRO_Mid.csv"))
+    Q3_Mro = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable3_QMRO_Mid.csv"))
+    Q4_Mro = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable4_QMRO_Mid.csv"))
+    Q5_Mro = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable5_QMRO_Mid.csv"))
     # Q=table for MLB
-    Q1_Mlb = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable1_QMLB_Mid.csv"))
-    Q2_Mlb = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable2_QMLB_Mid.csv"))
-    Q3_Mlb = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable3_QMLB_Mid.csv"))
-    Q4_Mlb = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable4_QMLB_Mid.csv"))
-    Q5_Mlb = np.array(csv2list("/dir/SLC2/Qtable/mid/Qtable5_QMLB_Mid.csv"))
+    Q1_Mlb = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable1_QMLB_Mid.csv"))
+    Q2_Mlb = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable2_QMLB_Mid.csv"))
+    Q3_Mlb = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable3_QMLB_Mid.csv"))
+    Q4_Mlb = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable4_QMLB_Mid.csv"))
+    Q5_Mlb = np.array(csv2list("/home/mnc/CADC/Qtable/mid/Qtable5_QMLB_Mid.csv"))
 
-    Coordinator = DDQNAgent(state_size, action_size)
+    # Agents of Clusters
+    C1_Coordinator = DDQNAgent(C1_state_size, C1_action_size)
+
+    C2_Coordinator = DDQNAgent(C2_state_size, C2_action_size)
+
+    C3_Coordinator = DDQNAgent(C3_state_size, C3_action_size)
 
     torch.autograd.set_detect_anomaly(True)
 
@@ -439,8 +488,8 @@ if __name__ == "__main__" :
                 
 
                 for k in range(5):
-                    print("ENB {} actions HOM: {}  TTT: {}".format(k+1, env_actions_Mro[2*k+1], env_actions_Mro[2*k]))
-                    print("ENB {} actions CIO: {} ".format(k+1, env_actions_Mlb[k]))
+                    print("BS {} QMRO actions HOM: {}  TTT: {}".format(k+1, env_actions_Mro[2*k+1], env_actions_Mro[2*k]))
+                    print("BS {} QLB actions CIO: {} ".format(k+1, env_actions_Mlb[k]))
                 
                 env_actions = []
                 for n in env_actions_Mlb:
@@ -492,48 +541,192 @@ if __name__ == "__main__" :
                     else:
                         tttAction.append(-1.0)
                 
-                state1_coordinator = np.array(cioAction)
-                state1_coordinator = np.reshape(state1_coordinator, (5, 1))
-                state1_coordinator = state1_coordinator.astype(np.float64)
+                C1_cioAction = []
+                C2_cioAction = []
+                C3_cioAction = []
 
-                state2_coordinator = np.array(homAction)
-                state2_coordinator = np.reshape(state2_coordinator, (5, 1))
-                state2_coordinator = state2_coordinator.astype(np.float64)
+                C1_homAction = []
+                C2_homAction = []
+                C3_homAction = []
 
-                state3_coordinator = np.array(tttAction)
-                state3_coordinator = np.reshape(state3_coordinator, (5, 1))
-                state3_coordinator = state3_coordinator.astype(np.float64)
+                C1_tttAction = []
+                C2_tttAction = []
+                C3_tttAction = []
 
-                state4_coordinator  = np.reshape(state['AvgCqi'], [5,1])
-                state4_coordinator = state4_coordinator.astype(np.float64)
+                C1_AvgCqi = []
+                C2_AvgCqi = []
+                C3_AvgCqi = []
 
-                state5_coordinator = np.reshape(state['dlPrbusage'], [5,1])
-                state5_coordinator = state5_coordinator.astype(np.float64)
+                C1_dlPrbUsage = []
+                C2_dlPrbUsage = []
+                C3_dlPrbUsage = []
 
-                state6_coordinator = np.reshape(state['enbBestCell'], [5,1])
-                state6_coordinator = state6_coordinator.astype(np.float64)
+                C1_BestCell = []
+                C2_BestCell = []
+                C3_BestCell = []
+
+                AvgCqi = state['AvgCqi']
+                dlPrbusage = state['dlPrbusage']
+                BestCell = state['enbBestCell']
+
+                # Cluster 1 
+                # Initial State
+                ######################################################################################
+                C1_cioAction.extend(cioAction[i] for i in cluster_list[0])
+                C1_homAction.extend(homAction[i] for i in cluster_list[0])
+                C1_tttAction.extend(tttAction[i] for i in cluster_list[0])
+                C1_AvgCqi.extend(AvgCqi[i] for i in cluster_list[0])
+                C1_dlPrbUsage.extend(dlPrbusage[i] for i in cluster_list[0])
+                C1_BestCell.extend(BestCell[i] for i in cluster_list[0])  
+
+
+                C1_state1_coordinator = np.array(C1_cioAction)
+                C1_state1_coordinator = np.reshape(C1_state1_coordinator, (1, 1))
+                C1_state1_coordinator = C1_state1_coordinator.astype(np.float64)
+
+                C1_state2_coordinator = np.array(C1_homAction)
+                C1_state2_coordinator = np.reshape(C1_state2_coordinator, (1, 1))
+                C1_state2_coordinator = C1_state2_coordinator.astype(np.float64)
+
+                C1_state3_coordinator = np.array(C1_tttAction)
+                C1_state3_coordinator = np.reshape(C1_state3_coordinator, (1, 1))
+                C1_state3_coordinator = C1_state3_coordinator.astype(np.float64)
+
+                C1_state4_coordinator = np.array(C1_AvgCqi)
+                C1_state4_coordinator = np.reshape(C1_state4_coordinator, (1, 1))
+                C1_state4_coordinator = C1_state4_coordinator.astype(np.float64)
+
+                C1_state5_coordinator = np.array(C1_dlPrbUsage)
+                C1_state5_coordinator = np.reshape(C1_state5_coordinator, (1, 1))
+                C1_state5_coordinator = C1_state5_coordinator.astype(np.float64)
+
+                C1_state6_coordinator = np.array(C1_BestCell)
+                C1_state6_coordinator = np.reshape(C1_state6_coordinator, (1, 1))
+                C1_state6_coordinator = C1_state6_coordinator.astype(np.float64)
+
+                C1_Coordinator_state = np.concatenate( (C1_state1_coordinator, 
+                                                     C1_state2_coordinator, 
+                                                     C1_state3_coordinator, 
+                                                     C1_state4_coordinator,
+                                                     C1_state5_coordinator,
+                                                     C1_state6_coordinator) )
+                C1_Coordinator_state = np.reshape(C1_Coordinator_state, [1,C1_state_size])
+                C1_Coordinator_state_array = np.array(C1_Coordinator_state)
+
+                C1_Coordinator_state = C1_Coordinator_state_array
+                ######################################################################################
+
+                # Cluster 2 
+                # Initial State
+                ######################################################################################
+                C2_cioAction.extend(cioAction[i] for i in cluster_list[1])
+                C2_homAction.extend(homAction[i] for i in cluster_list[1])
+                C2_tttAction.extend(tttAction[i] for i in cluster_list[1])
+                C2_AvgCqi.extend(AvgCqi[i] for i in cluster_list[1])
+                C2_dlPrbUsage.extend(dlPrbusage[i] for i in cluster_list[1])
+                C2_BestCell.extend(BestCell[i] for i in cluster_list[1])  
+
+                C2_state1_coordinator = np.array(C2_cioAction)
+                C2_state1_coordinator = np.reshape(C2_state1_coordinator, (1, 1))
+                C2_state1_coordinator = C2_state1_coordinator.astype(np.float64)
+
+                C2_state2_coordinator = np.array(C2_homAction)
+                C2_state2_coordinator = np.reshape(C2_state2_coordinator, (1, 1))
+                C2_state2_coordinator = C2_state2_coordinator.astype(np.float64)
+
+                C2_state3_coordinator = np.array(C2_tttAction)
+                C2_state3_coordinator = np.reshape(C2_state3_coordinator, (1, 1))
+                C2_state3_coordinator = C2_state3_coordinator.astype(np.float64)
+
+                C2_state4_coordinator = np.array(C2_AvgCqi)
+                C2_state4_coordinator = np.reshape(C2_state4_coordinator, (1, 1))
+                C2_state4_coordinator = C2_state4_coordinator.astype(np.float64)
                 
-                Coordinator_state = np.concatenate( (state1_coordinator, 
-                                                     state2_coordinator, 
-                                                     state3_coordinator, 
-                                                     state4_coordinator,
-                                                     state5_coordinator,
-                                                     state6_coordinator) )
-                Coordinator_state = np.reshape(Coordinator_state, [1,state_size])
-                coordinator_state_array = np.array(Coordinator_state)
-                Coordinator_state = coordinator_state_array
+                C2_state5_coordinator = np.array(C2_dlPrbUsage)
+                C2_state5_coordinator = np.reshape(C2_state5_coordinator, (1, 1))
+                C2_state5_coordinator = C2_state5_coordinator.astype(np.float64)
+                
+                C2_state6_coordinator = np.array(C2_BestCell)
+                C2_state6_coordinator = np.reshape(C2_state6_coordinator, (1, 1))
+                C2_state6_coordinator = C2_state6_coordinator.astype(np.float64)
 
-            env_index = []
-            action_coordinator = Coordinator.act(Coordinator_state)
+                C2_Coordinator_state = np.concatenate( (C2_state1_coordinator, 
+                                                     C2_state2_coordinator, 
+                                                     C2_state3_coordinator, 
+                                                     C2_state4_coordinator,
+                                                     C2_state5_coordinator,
+                                                     C2_state6_coordinator) )
+                C2_Coordinator_state = np.reshape(C2_Coordinator_state, [1,C2_state_size])
+                C2_Coordinator_state_array = np.array(C2_Coordinator_state)
+                
+                C2_Coordinator_state = C2_Coordinator_state_array
+                ######################################################################################
 
-            actions_coordinator = action_coordinator.unsqueeze(1).cpu().numpy()
-            print("actions coordinator: ",actions_coordinator)
+                # Cluster 3 
+                # Initial State
+                ######################################################################################
+                C3_cioAction.extend(cioAction[i] for i in cluster_list[2])
+                C3_homAction.extend(homAction[i] for i in cluster_list[2])
+                C3_tttAction.extend(tttAction[i] for i in cluster_list[2])
+                C3_AvgCqi.extend(AvgCqi[i] for i in cluster_list[2])
+                C3_dlPrbUsage.extend(dlPrbusage[i] for i in cluster_list[2])
+                C3_BestCell.extend(BestCell[i] for i in cluster_list[2])  
 
-            env_index.append(action_coordinator.item())  
+                C3_state1_coordinator = np.array(C3_cioAction)
+                C3_state1_coordinator = np.reshape(C3_state1_coordinator, (3, 1))
+                C3_state1_coordinator = C3_state1_coordinator.astype(np.float64)
+
+                C3_state2_coordinator = np.array(C3_homAction)
+                C3_state2_coordinator = np.reshape(C3_state2_coordinator, (3, 1))
+                C3_state2_coordinator = C3_state2_coordinator.astype(np.float64)
+
+                C3_state3_coordinator = np.array(C3_tttAction)
+                C3_state3_coordinator = np.reshape(C3_state3_coordinator, (3, 1))
+                C3_state3_coordinator = C3_state3_coordinator.astype(np.float64)
+
+                C3_state4_coordinator = np.array(C3_AvgCqi)
+                C3_state4_coordinator = np.reshape(C3_state4_coordinator, (3, 1))
+                C3_state4_coordinator = C3_state4_coordinator.astype(np.float64)
+                
+                C3_state5_coordinator = np.array(C3_dlPrbUsage)
+                C3_state5_coordinator = np.reshape(C3_state5_coordinator, (3, 1))
+                C3_state5_coordinator = C3_state5_coordinator.astype(np.float64)
+                
+                C3_state6_coordinator = np.array(C3_BestCell)
+                C3_state6_coordinator = np.reshape(C3_state6_coordinator, (3, 1))
+                C3_state6_coordinator = C3_state6_coordinator.astype(np.float64)
+
+                C3_Coordinator_state = np.concatenate( (C3_state1_coordinator, 
+                                                     C3_state2_coordinator, 
+                                                     C3_state3_coordinator, 
+                                                     C3_state4_coordinator,
+                                                     C3_state5_coordinator,
+                                                     C3_state6_coordinator) )
+                C3_Coordinator_state = np.reshape(C3_Coordinator_state, [1,C3_state_size])
+                C3_Coordinator_state_array = np.array(C3_Coordinator_state)
+                
+                C3_Coordinator_state = C3_Coordinator_state_array
+                ######################################################################################
+
+                prev_state = state
+
+            # Action
+            ##########################################################################################
+            # Action of each cluster
+            C1_action_coordinator = C1_Coordinator.act(C1_Coordinator_state)
+            C2_action_coordinator = C2_Coordinator.act(C2_Coordinator_state)
+            C3_action_coordinator = C3_Coordinator.act(C3_Coordinator_state)
+
+            C1_actions_coordinator = C1_action_coordinator.unsqueeze(1).cpu().numpy()
+            C2_actions_coordinator = C2_action_coordinator.unsqueeze(1).cpu().numpy()
+            C3_actions_coordinator = C3_action_coordinator.unsqueeze(1).cpu().numpy()
             
-            print("env_index",env_index)
-
-            env_actions_coordinator = action_func_coordinator(env_index)
+            env_index = []
+            env_index.append(C1_action_coordinator.item())
+            env_index.append(C2_action_coordinator.item())
+            env_index.append(C3_action_coordinator.item())
+            
+            env_actions_coordinator = action_func_coordinator_cluster(env_index, cluster_list)
 
             env_actions_chose = [0] * 15
 
@@ -560,8 +753,8 @@ if __name__ == "__main__" :
 
 
             for k in range(5) :
-                print("ENB {} actions HOM: {}  TTT: {}".format(k+1, env_actions_chose[2*k+6], env_actions_chose[2*k+5]))
-                print("ENB {} actions CIO: {} ".format(k+1, env_actions_chose[k]))
+                print("After Coordination, BS {} actions HOM: {}  TTT: {}".format(k+1, env_actions_chose[2*k+6], env_actions_chose[2*k+5]))
+                print("After Coordination, BS {} actions CIO: {} ".format(k+1, env_actions_chose[k]))
                 
                 if (env_actions_coordinator[k] == 0) :
                     print(" MRO : O MLB : O ")
@@ -574,6 +767,8 @@ if __name__ == "__main__" :
     
             
             # Get new state and reward from environment
+            if(j>1) :
+                prev_state = new_state
             new_state, reward, done, _ = env.step(env_actions_chose)
 
             if new_state is None:
@@ -720,75 +915,247 @@ if __name__ == "__main__" :
                 else:
                     tttAction.append(-1.0)
                 
-            new_state1_coordinator = np.array(cioAction)
-            new_state1_coordinator = np.reshape(state1_coordinator, (5, 1))
-            new_state1_coordinator = state1_coordinator.astype(np.float64)
+            C1_cioAction = []
+            C2_cioAction = []
+            C3_cioAction = []
 
-            new_state2_coordinator = np.array(homAction)
-            new_state2_coordinator = np.reshape(state2_coordinator, (5, 1))
-            new_state2_coordinator = state2_coordinator.astype(np.float64)
+            C1_homAction = []
+            C2_homAction = []
+            C3_homAction = []
 
-            new_state3_coordinator = np.array(tttAction)
-            new_state3_coordinator = np.reshape(state3_coordinator, (5, 1))
-            new_state3_coordinator = state3_coordinator.astype(np.float64)
+            C1_tttAction = []
+            C2_tttAction = []
+            C3_tttAction = []
 
-            new_state4_coordinator  = np.reshape(new_state['AvgCqi'], [5,1])
-            new_state4_coordinator = new_state4_coordinator.astype(np.float64)
+            C1_AvgCqi = []
+            C2_AvgCqi = []
+            C3_AvgCqi = []
 
-            new_state5_coordinator = np.reshape(new_state['dlPrbusage'], [5,1])
-            new_state5_coordinator = new_state5_coordinator.astype(np.float64)
-
-            new_state6_coordinator = np.reshape(new_state['enbBestCell'], [5,1])
-            new_state6_coordinator = new_state6_coordinator.astype(np.float64)
-
-            new_Coordinator_state = np.concatenate( (new_state1_coordinator, 
-                                                     new_state2_coordinator, 
-                                                     new_state3_coordinator, 
-                                                     new_state4_coordinator,
-                                                     new_state5_coordinator,
-                                                     new_state6_coordinator) )
+            C1_dlPrbUsage = []
+            C2_dlPrbUsage = []
+            C3_dlPrbUsage = []
             
-            new_Coordinator_state = np.reshape(new_Coordinator_state, [1,state_size])
+            C1_BestCell = []
+            C2_BestCell = []
+            C3_BestCell = []
 
-            new_coordinator_state_array = np.array(new_Coordinator_state)
-            new_Coordinator_state = new_coordinator_state_array
-
-            enbStepPrb = np.reshape(new_state['enbStepPrb'],[5,1]).squeeze()
-            enbStepRlf = np.reshape(new_state['enbStepRlf'],[5,1]).squeeze()
-            enbStepPp = np.reshape(new_state['enbStepPp'],[5,1]).squeeze()
-
-            load_std = np.std(enbStepPrb/100)
-            rlf_rate = (np.sum(enbStepRlf) / 40)
-            pp_rate = (np.sum(enbStepPp) / 40)
-
-            hoap = rlf_rate * 0.7 + pp_rate * 0.3
-
-            load_std_min = 0
-            load_std_max = 0.4
-
-            hoap_min = 0
-            hoap_max = 0.7
-
-            normalized_load_std = (load_std - load_std_min) / (load_std_max - load_std_min)
-            normalized_hoap = (hoap - hoap_min) / (hoap_max - hoap_min)
-
-            reward_weight = 2.75
-            coordi_reward = (-normalized_load_std - reward_weight*normalized_hoap)*50
+            AvgCqi = new_state['AvgCqi']
+            dlPrbusage = new_state['dlPrbusage']
+            BestCell = new_state['enbBestCell']
             
-            coordi_reward = np.reshape(coordi_reward,[1,1])
-            coordi_reward = coordi_reward[0:1,0:1]
-            coordi_reward = np.round(coordi_reward,5)
-            print("Coordinator Reward: ",coordi_reward)
+            # Cluster 1 
+            # Initial State
+            ######################################################################################
+            C1_cioAction.extend(cioAction[i] for i in cluster_list[0])
+            C1_homAction.extend(homAction[i] for i in cluster_list[0])
+            C1_tttAction.extend(tttAction[i] for i in cluster_list[0])
+            C1_AvgCqi.extend(AvgCqi[i] for i in cluster_list[0])
+            C1_dlPrbUsage.extend(dlPrbusage[i] for i in cluster_list[0])
+            C1_BestCell.extend(BestCell[i] for i in cluster_list[0]) 
   
-            Coordinator.remember(Coordinator_state, actions_coordinator, coordi_reward, new_Coordinator_state)
+            C1_new_state1_coordinator = np.array(C1_cioAction)
+            C1_new_state1_coordinator = np.reshape(C1_new_state1_coordinator, (1, 1))
+            C1_new_state1_coordinator = C1_new_state1_coordinator.astype(np.float64)
+            
+            C1_new_state2_coordinator = np.array(C1_homAction)
+            C1_new_state2_coordinator = np.reshape(C1_new_state2_coordinator, (1, 1))
+            C1_new_state2_coordinator = C1_new_state2_coordinator.astype(np.float64)
+            
+            C1_new_state3_coordinator = np.array(C1_tttAction)
+            C1_new_state3_coordinator = np.reshape(C1_new_state3_coordinator, (1, 1))
+            C1_new_state3_coordinator = C1_new_state3_coordinator.astype(np.float64)
+            
+            C1_new_state4_coordinator = np.array(C1_AvgCqi)
+            C1_new_state4_coordinator = np.reshape(C1_new_state4_coordinator, (1, 1))
+            C1_new_state4_coordinator = C1_new_state4_coordinator.astype(np.float64)
+            
+            C1_new_state5_coordinator = np.array(C1_dlPrbUsage)
+            C1_new_state5_coordinator = np.reshape(C1_new_state5_coordinator, (1, 1))
+            C1_new_state5_coordinator = C1_new_state5_coordinator.astype(np.float64)
+            
+            C1_new_state6_coordinator = np.array(C1_BestCell)
+            C1_new_state6_coordinator = np.reshape(C1_new_state6_coordinator, (1, 1))
+            C1_new_state6_coordinator = C1_new_state6_coordinator.astype(np.float64)
 
-            Coordinator_state = new_Coordinator_state 
+            C1_new_Coordinator_state = np.concatenate( (C1_new_state1_coordinator, 
+                                                 C1_new_state2_coordinator, 
+                                                 C1_new_state3_coordinator, 
+                                                 C1_new_state4_coordinator,
+                                                 C1_new_state5_coordinator,
+                                                 C1_new_state6_coordinator) )
+            C1_new_Coordinator_state = np.reshape(C1_new_Coordinator_state, [1,C1_state_size])
+            C1_new_Coordinator_state_array = np.array(C1_Coordinator_state)
 
-            Coordinator.learn(batch_size)
+            C1_new_Coordinator_state = C1_new_Coordinator_state_array
+            ######################################################################################
+                
+            # Cluster 2 
+            # Initial State
+            ######################################################################################
+            C2_cioAction.extend(cioAction[i] for i in cluster_list[1])
+            C2_homAction.extend(homAction[i] for i in cluster_list[1])
+            C2_tttAction.extend(tttAction[i] for i in cluster_list[1])
+            C2_AvgCqi.extend(AvgCqi[i] for i in cluster_list[1])
+            C2_dlPrbUsage.extend(dlPrbusage[i] for i in cluster_list[1])
+            C2_BestCell.extend(BestCell[i] for i in cluster_list[1])  
+
+            C2_new_state1_coordinator = np.array(C2_cioAction)
+            C2_new_state1_coordinator = np.reshape(C2_new_state1_coordinator, (1, 1))
+            C2_new_state1_coordinator = C2_new_state1_coordinator.astype(np.float64)
+            
+            C2_new_state2_coordinator = np.array(C2_homAction)
+            C2_new_state2_coordinator = np.reshape(C2_new_state2_coordinator, (1, 1))
+            C2_new_state2_coordinator = C2_new_state2_coordinator.astype(np.float64)
+            
+            C2_new_state3_coordinator = np.array(C2_tttAction)
+            C2_new_state3_coordinator = np.reshape(C2_new_state3_coordinator, (1, 1))
+            C2_new_state3_coordinator = C2_new_state3_coordinator.astype(np.float64)
+            
+            C2_new_state4_coordinator = np.array(C2_AvgCqi)
+            C2_new_state4_coordinator = np.reshape(C2_new_state4_coordinator, (1, 1))
+            C2_new_state4_coordinator = C2_new_state4_coordinator.astype(np.float64)
+            
+            C2_new_state5_coordinator = np.array(C2_dlPrbUsage)
+            C2_new_state5_coordinator = np.reshape(C2_new_state5_coordinator, (1, 1))
+            C2_new_state5_coordinator = C2_new_state5_coordinator.astype(np.float64) 
+            
+            C2_new_state6_coordinator = np.array(C2_BestCell)
+            C2_new_state6_coordinator = np.reshape(C2_new_state6_coordinator, (1, 1))
+            C2_new_state6_coordinator = C2_new_state6_coordinator.astype(np.float64)
+
+            C2_new_Coordinator_state = np.concatenate( (C2_new_state1_coordinator, 
+                                                 C2_new_state2_coordinator, 
+                                                 C2_new_state3_coordinator, 
+                                                 C2_new_state4_coordinator,
+                                                 C2_new_state5_coordinator,
+                                                 C2_new_state6_coordinator) )
+            C2_new_Coordinator_state = np.reshape(C2_new_Coordinator_state, [1,C2_state_size])
+            C2_new_Coordinator_state_array = np.array(C2_new_Coordinator_state)
+            
+            C2_new_Coordinator_state = C2_new_Coordinator_state_array
+            ######################################################################################
+
+            # Cluster 3
+            # Initial State
+            ######################################################################################
+            C3_cioAction.extend(cioAction[i] for i in cluster_list[2])
+            C3_homAction.extend(homAction[i] for i in cluster_list[2])
+            C3_tttAction.extend(tttAction[i] for i in cluster_list[2])
+            C3_AvgCqi.extend(AvgCqi[i] for i in cluster_list[2])
+            C3_dlPrbUsage.extend(dlPrbusage[i] for i in cluster_list[2])
+            C3_BestCell.extend(BestCell[i] for i in cluster_list[2])  
+
+            C3_new_state1_coordinator = np.array(C3_cioAction)
+            C3_new_state1_coordinator = np.reshape(C3_new_state1_coordinator, (3, 1))
+            C3_new_state1_coordinator = C3_new_state1_coordinator.astype(np.float64)
+        
+            C3_new_state2_coordinator = np.array(C3_homAction)
+            C3_new_state2_coordinator = np.reshape(C3_new_state2_coordinator, (3, 1))
+            C3_new_state2_coordinator = C3_new_state2_coordinator.astype(np.float64)
+        
+            C3_new_state3_coordinator = np.array(C3_tttAction)
+            C3_new_state3_coordinator = np.reshape(C3_new_state3_coordinator, (3, 1))
+            C3_new_state3_coordinator = C3_new_state3_coordinator.astype(np.float64)
+        
+            C3_new_state4_coordinator = np.array(C3_AvgCqi)
+            C3_new_state4_coordinator = np.reshape(C3_new_state4_coordinator, (3, 1))
+            C3_new_state4_coordinator = C3_new_state4_coordinator.astype(np.float64)
+        
+            C3_new_state5_coordinator = np.array(C3_dlPrbUsage)
+            C3_new_state5_coordinator = np.reshape(C3_new_state5_coordinator, (3, 1))
+            C3_new_state5_coordinator = C3_new_state5_coordinator.astype(np.float64) 
+        
+            C3_new_state6_coordinator = np.array(C3_BestCell)
+            C3_new_state6_coordinator = np.reshape(C3_new_state6_coordinator, (3, 1))
+            C3_new_state6_coordinator = C3_new_state6_coordinator.astype(np.float64)
+            C3_new_Coordinator_state = np.concatenate( (C3_new_state1_coordinator, 
+                                                 C3_new_state2_coordinator, 
+                                                 C3_new_state3_coordinator, 
+                                                 C3_new_state4_coordinator,
+                                                 C3_new_state5_coordinator,
+                                                 C3_new_state6_coordinator) )
+            C3_new_Coordinator_state = np.reshape(C3_new_Coordinator_state, [1,C3_state_size])
+            C3_new_Coordinator_state_array = np.array(C3_new_Coordinator_state)
+            
+            C3_new_Coordinator_state = C3_new_Coordinator_state_array
+            ######################################################################################
+
+            bsStepPrb = new_state['enbStepPrb']
+            bsStepRlf = new_state['enbStepRlf']
+            bsStepPp = new_state['enbStepPp']
+
+            C1_bsStepRlf = []
+            C2_bsStepRlf = []
+            C3_bsStepRlf = []
+
+            C1_bsStepPp = []
+            C2_bsStepPp = []
+            C3_bsStepPp = []
+
+            # ###########################################
+            C1_bsStepRlf.extend(bsStepRlf[i] for i in cluster_list[0])
+            C2_bsStepRlf.extend(bsStepRlf[i] for i in cluster_list[1])
+            C3_bsStepRlf.extend(bsStepRlf[i] for i in cluster_list[2])
+
+            C1_bsStepPp.extend(bsStepPp[i] for i in cluster_list[0])
+            C2_bsStepPp.extend(bsStepPp[i] for i in cluster_list[1])
+            C3_bsStepPp.extend(bsStepPp[i] for i in cluster_list[2])
+            # ###########################################
+
+            mlbEft = jains_index(bsStepPrb)
+
+            C1_hoap = (0.7 * sum(C1_bsStepRlf) + 0.3 * sum(C1_bsStepPp))
+            C2_hoap = (0.7 * sum(C2_bsStepRlf) + 0.3 * sum(C2_bsStepPp)) 
+            C3_hoap = (0.7 * sum(C3_bsStepRlf) + 0.3 * sum(C3_bsStepPp)) 
+            
+            bsStepUeNum = prev_state['bsStepUeNum']
+            C1_bsStepUeNum = sum(bsStepUeNum[i] for i in cluster_list[0])
+            C2_bsStepUeNum = sum(bsStepUeNum[i] for i in cluster_list[1])
+            C3_bsStepUeNum = sum(bsStepUeNum[i] for i in cluster_list[2])
+            
+            hoap_min = 0
+            C1_hoap_max = 0.7*C1_bsStepUeNum
+            C2_hoap_max = 0.7*C2_bsStepUeNum
+            C3_hoap_max = 0.7*C3_bsStepUeNum
+            
+            C1_hoap_normalized = (C1_hoap - hoap_min) / (C1_hoap_max - hoap_min) 
+            C2_hoap_normalized = (C2_hoap - hoap_min) / (C2_hoap_max - hoap_min) 
+            C3_hoap_normalized = (C3_hoap - hoap_min) / (C3_hoap_max - hoap_min) 
+            
+            reward_weight_MRO = 0.9 
+            reward_weight_MLB = 0.1 
+
+            C1_coordi_reward = (reward_weight_MLB * mlbEft - reward_weight_MRO * C1_hoap_normalized) * 10
+            C2_coordi_reward = (reward_weight_MLB * mlbEft - reward_weight_MRO * C2_hoap_normalized) * 10
+            C3_coordi_reward = (reward_weight_MLB * mlbEft - reward_weight_MRO * C3_hoap_normalized) * 10
+
+            C1_coordi_reward = np.reshape(C1_coordi_reward, [1,1])
+            C1_coordi_reward = C1_coordi_reward[0:1, 0:1]
+            C1_coordi_reward = np.round(C1_coordi_reward, 5)
+            C2_coordi_reward = np.reshape(C2_coordi_reward, [1,1])
+            C2_coordi_reward = C2_coordi_reward[0:1, 0:1]
+            C2_coordi_reward = np.round(C2_coordi_reward, 5)
+            C3_coordi_reward = np.reshape(C3_coordi_reward, [1,1])
+            C3_coordi_reward = C3_coordi_reward[0:1, 0:1]
+            C3_coordi_reward = np.round(C3_coordi_reward, 5)
+
+            C1_Coordinator.remember(C1_Coordinator_state, C1_actions_coordinator, C1_coordi_reward, C1_new_Coordinator_state)
+            C2_Coordinator.remember(C2_Coordinator_state, C2_actions_coordinator, C2_coordi_reward, C2_new_Coordinator_state)
+            C3_Coordinator.remember(C3_Coordinator_state, C3_actions_coordinator, C3_coordi_reward, C3_new_Coordinator_state)
+
+            C1_Coordinator_state = C1_new_Coordinator_state
+            C2_Coordinator_state = C2_new_Coordinator_state
+            C3_Coordinator_state = C3_new_Coordinator_state
+
+            C1_Coordinator.learn(batch_size)
+            C2_Coordinator.learn(batch_size)
+            C3_Coordinator.learn(batch_size)
 
             if((j%13) == 0) :
                 print("Target network update")
-                Coordinator.update_target_model()
+                C1_Coordinator.update_target_model()
+                C2_Coordinator.update_target_model()
+                C3_Coordinator.update_target_model()
 
             env_actions = []
             for n in new_env_actions_Mlb:

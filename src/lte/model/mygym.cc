@@ -29,6 +29,8 @@
 
 #include "ns3/log.h"
 
+#include "fstream"
+
 #include <sstream>
 
 #include <iostream>
@@ -152,8 +154,6 @@ namespace ns3 {
             std::vector < uint32_t > shape = {m_cellCount,};
             std::string dtype = TypeNameGet < float > ();
             Ptr < OpenGymBoxSpace > rbUtil = CreateObject < OpenGymBoxSpace > (low, high, shape, dtype);
-            Ptr < OpenGymBoxSpace > FarUes = CreateObject < OpenGymBoxSpace > (low, high, shape, dtype);
-            Ptr < OpenGymBoxSpace > mroCount = CreateObject < OpenGymBoxSpace > (low, high, shape, dtype);
             Ptr < OpenGymBoxSpace > Throughput = CreateObject < OpenGymBoxSpace > (0, 50, shape, dtype);
             Ptr < OpenGymBoxSpace > dlPrbusage = CreateObject < OpenGymBoxSpace > (0, 1, shape, dtype);
             Ptr < OpenGymBoxSpace > AverageVelocity = CreateObject < OpenGymBoxSpace > (0, 15, shape, dtype);
@@ -168,6 +168,7 @@ namespace ns3 {
             Ptr < OpenGymBoxSpace > enbStepPrb = CreateObject < OpenGymBoxSpace > (-100000, 100000, shape, dtype);
             Ptr < OpenGymBoxSpace > enbStepRlf = CreateObject < OpenGymBoxSpace > (-100000, 100000, shape, dtype);
             Ptr < OpenGymBoxSpace > enbStepPp = CreateObject < OpenGymBoxSpace > (-100000, 100000, shape, dtype);
+            Ptr < OpenGymBoxSpace > bsStepUeNum = CreateObject < OpenGymBoxSpace > (-100000, 100000, shape, dtype);
 
             shape = {m_userCount,};
             Ptr < OpenGymBoxSpace > CurrentRsrp = CreateObject < OpenGymBoxSpace > (-150, 100000, shape, dtype);
@@ -177,10 +178,11 @@ namespace ns3 {
             Ptr < OpenGymBoxSpace > IsBestCell = CreateObject < OpenGymBoxSpace > (-100000, 100000, shape, dtype);
             Ptr < OpenGymBoxSpace > Results = CreateObject < OpenGymBoxSpace > (-100000, 100000, shape, dtype);
 
+
+
+
             Ptr<OpenGymDictSpace> space = CreateObject<OpenGymDictSpace> ();
             space -> Add("rbUtil", rbUtil);
-            space -> Add("FarUes", FarUes);
-            space -> Add("mroCount", mroCount);
             space -> Add("AvgCqi", AvgCqi);
             space -> Add("TotalCqi",TotalCqi);
             space -> Add("dlPrbusage", dlPrbusage);
@@ -200,7 +202,7 @@ namespace ns3 {
             space -> Add("enbStepPrb",enbStepPrb);
             space -> Add("enbStepRlf",enbStepRlf);
             space -> Add("enbStepPp",enbStepPp);
-
+            space -> Add("bsStepUeNum",bsStepUeNum);
             return space;
         }
 
@@ -220,29 +222,13 @@ namespace ns3 {
             calculate_rewards();
 
             step ++;
+            std::cout<<"step: "<<step<<std::endl;
 
             Ptr < OpenGymDictContainer > obsContainer = CreateObject < OpenGymDictContainer > ();
             std::vector < uint32_t > shape = { m_cellCount, };
 
             std::vector<float> Far_UEs;
             std::vector<float> Served_UEs;
-
-            std::vector<float> normal_RB;
-            // std::vector<float> PRB_lin;
-
-            Ptr < OpenGymBoxContainer < float > > box1 = CreateObject < OpenGymBoxContainer < float > > (shape);
-            box1 = CreateObject < OpenGymBoxContainer < float > > (shape);
-
-            std::map<uint8_t, float> enbStepRbUtil;
-            float normalizedRBUtil;
-            for (uint8_t idx = 0; idx < m_cellCount; ++idx) {
-                normalizedRBUtil = float(m_rbUtil.at(idx)) / m_nRBTotal ;
-                normal_RB.push_back(normalizedRBUtil);
-                box1 -> AddValue(normalizedRBUtil);
-                //To see normalized RB util
-                enbStepRbUtil[idx+1] = normalizedRBUtil;
-            }
-            obsContainer -> Add("rbUtil", box1);
 
             uint32_t enbIdx = 1;
             for (std::map<uint32_t, Ptr<LteEnbNetDevice>>::iterator iter = m_enbs.begin(); iter != m_enbs.end(); ++iter){
@@ -267,6 +253,21 @@ namespace ns3 {
                 SinrAvg.push_back(sinrAvg);
                 IsBestCell.push_back(isBestCell);
             }
+            std::vector<float> normal_RB;
+
+            Ptr < OpenGymBoxContainer < float > > box1 = CreateObject < OpenGymBoxContainer < float > > (shape);
+            box1 = CreateObject < OpenGymBoxContainer < float > > (shape);
+
+            std::map<uint8_t, float> enbStepRbUtil;
+            float normalizedRBUtil;
+            for (uint8_t idx = 0; idx < m_cellCount; ++idx) {
+                normalizedRBUtil = float(m_rbUtil.at(idx)) / m_nRBTotal ;
+                normal_RB.push_back(normalizedRBUtil);
+                box1 -> AddValue(normalizedRBUtil);
+                //To see normalized RB util
+                enbStepRbUtil[idx+1] = normalizedRBUtil;
+            }
+            obsContainer -> Add("rbUtil", box1);
             
             // Average SINR
             Ptr < OpenGymBoxContainer < float > > box2 = CreateObject < OpenGymBoxContainer < float > > (shape);
@@ -418,6 +419,9 @@ namespace ns3 {
             std::map<uint32_t, int> eNBStepRlf;
             std::map<uint32_t, int> eNBStepPp; 
 
+            std::map<uint64_t, int> ueStepRlf;
+            std::map<uint64_t, int> ueStepPp;
+
             std::map<uint32_t, float> eNBStepMroReward;
 
             float TotalMroReward =0;
@@ -444,11 +448,23 @@ namespace ns3 {
                     int Counter2 = UeNetDevice->GetPhy()->GetTooEarlyHO_CNT();
                     int Counter3 = UeNetDevice->GetPhy()->GetWrongCellHO_CNT();
 
-                    stepRlf = stepRlf + (Counter1 + Counter2 + Counter3);
+                    int Counter = Counter1 + Counter2 + Counter3;
+
+                    uint64_t imsi = Imsi_List[i];
+                    
+                    if(Counter != 0){
+                        ueStepRlf[imsi] = Counter; // For Position of RLF occurrences
+                    }
+                    
+                    stepRlf = stepRlf + Counter;
 
                     // Step PP
                     int Counter4 = UeNetDevice->GetPhy()->GetPingPong_CNT();
 
+                    if(Counter4 != 0){
+                        ueStepPp[imsi] = Counter4; // For Position of RLF occurrences
+                    }
+                    
                     stepPp = stepPp + Counter4;
 
                     stepReward = stepReward -(0.3*Counter4 + 0.1*Counter3 + 0.2*Counter2 + 0.5*Counter1);
@@ -477,11 +493,6 @@ namespace ns3 {
             box7 = CreateObject < OpenGymBoxContainer < float > > (shape);
             box7 -> SetData(distanceVector);
             obsContainer -> Add("EnbDistance", box7);
-
-            Ptr < OpenGymBoxContainer < float > > box8 = CreateObject < OpenGymBoxContainer < float > > (shape);
-            box8 = CreateObject < OpenGymBoxContainer < float > > (shape);
-            box8 -> SetData(Far_UEs);
-            obsContainer -> Add("FarUes", box8);
 
             // DL Throughput
             dlThroughput_IMSI = RlcStats->GetdlThroughput_IMSI();
@@ -589,52 +600,70 @@ namespace ns3 {
 
             ////////////////////////
 
-            // RLF Test
+            // Position of RLF Occurrences
             ////////////////////////
-            std::vector<float> mroCount(9, 0);
-            std::map<uint16_t,int> RlfCounter;
+            old_position_ues = position_ues;
+            position_ues.clear();
+
+            std::map<uint64_t, std::vector<double>> position_prob_ues; // For Position of RLF occurrences
+            
             for (std::map<uint64_t, Ptr<LteUeNetDevice>>::iterator iter = m_ues.begin(); iter != m_ues.end(); ++iter)
             {
-                std::map<uint16_t,int> RlfCounterperUe = iter->second->GetPhy()->GetRlfCounter();
-                iter->second->GetPhy()->ClearRlfCounter();
-            for (auto iter2 =RlfCounterperUe.begin();iter2!=RlfCounterperUe.end();iter2++)
-            {
-                if(RlfCounter.count(iter2->first)){
-                    RlfCounter[iter2->first]+=iter2->second;
-                }
-                else{
-                    RlfCounter.insert({iter2->first,iter2->second});
-                }
+                uint64_t imsi = (iter->first)-1;
+
+                double Ue_x = iter->second->GetNode()->GetObject<MobilityModel>()->GetPosition().x;
+                double Ue_y = iter->second->GetNode()->GetObject<MobilityModel>()->GetPosition().y;
+
+                std::vector<double> position_ue = {Ue_x, Ue_y};
+
+                position_ues[imsi] = position_ue;
             }
-            }
-            for (auto iter3 = RlfCounter.begin(); iter3 != RlfCounter.end(); iter3++)
-            {
-                if (iter3->first >= 1 && iter3->first <= mroCount.size()){
-                        mroCount[iter3->first - 1] = iter3->second;
+
+            if(old_position_ues.size() != 0){
+                for (auto it = ueStepRlf.begin(); it != ueStepRlf.end(); ++it){
+                    uint64_t t_imsi = it->first;
+
+                    if(position_prob_ues.find(t_imsi) == position_prob_ues.end()){
+                        std::vector<double> temp_position = position_ues[t_imsi];
+                        std::vector<double> old_temp_position = old_position_ues[t_imsi];
+
+                        temp_position.insert(temp_position.end(), old_temp_position.begin(), old_temp_position.end());
+                        position_prob_ues[t_imsi] = temp_position;
+                    }
+                    else{
+                        std::vector<double> temp_position = position_ues[t_imsi];
+                        std::vector<double> old_temp_position = old_position_ues[t_imsi];
+
+                        temp_position.insert(temp_position.end(), old_temp_position.begin(), old_temp_position.end());
+
+                        position_prob_ues[t_imsi].insert(position_prob_ues[t_imsi].end(), temp_position.begin(), temp_position.end());
+                    }
                 }
 
-            }
-            for (int k =0; k != 9 ; k++ )
-            {
-               if (mroCount[k]>0){
-                   
-                   mroCount[k]= 8;
-               }
-               else if (mroCount[k]==0){
-                   mroCount[k] = 0;
-               }
-               else {
-                   mroCount[k] = -8;
-               }
 
-            } //kihoon 0517
-            
-            Ptr < OpenGymBoxContainer < float > > box12 = CreateObject < OpenGymBoxContainer < float > > (shape);
-            box12 = CreateObject < OpenGymBoxContainer < float > > (shape);
-            box12 -> SetData(mroCount);
-            obsContainer -> Add("mroCount", box12);
+                for (auto it = ueStepPp.begin(); it != ueStepPp.end(); ++it){
+                    uint64_t t_imsi = it->first;
+
+                    if(position_prob_ues.find(t_imsi) == position_prob_ues.end()){
+                        std::vector<double> temp_position = position_ues[t_imsi];
+                        std::vector<double> old_temp_position = old_position_ues[t_imsi];
+
+                        temp_position.insert(temp_position.end(), old_temp_position.begin(), old_temp_position.end());
+                        position_prob_ues[t_imsi] = temp_position;
+                    }
+                    else{
+                        std::vector<double> temp_position = position_ues[t_imsi];
+                        std::vector<double> old_temp_position = old_position_ues[t_imsi];
+
+                        temp_position.insert(temp_position.end(), old_temp_position.begin(), old_temp_position.end());
+
+                        position_prob_ues[t_imsi].insert(position_prob_ues[t_imsi].end(), temp_position.begin(), temp_position.end());
+                    }
+                }
+            }
+
+
             ////////////////////////
-
 
             NS_LOG_LOGIC("MyGetObservation: " << obsContainer);
              double ueNum;
@@ -645,12 +674,18 @@ namespace ns3 {
             Ptr < OpenGymBoxContainer < double > > box13 = CreateObject < OpenGymBoxContainer < double > > (shape);
             box13 = CreateObject < OpenGymBoxContainer < double > > (shape);
 
+            Ptr < OpenGymBoxContainer < double > > box27 = CreateObject < OpenGymBoxContainer < double > > (shape);
+            box27 = CreateObject < OpenGymBoxContainer < double > > (shape);
+
             std::map<uint32_t, double> enbStepPrb;
             for (std::map<uint32_t, Ptr<LteEnbNetDevice>>::iterator iter = m_enbs.begin(); iter !=m_enbs.end(); ++iter){
                 uint32_t CellId = iter->first;
                 double numofues;
                 double dlprbusage;
                 numofues = (double)(iter->second->GetRrc ()->m_numofues);
+
+                box27->AddValue((int)numofues);
+                
                 if(ueNum==0){
                     dlprbusage = 0;
                 }
@@ -664,6 +699,7 @@ namespace ns3 {
 
             }
             obsContainer -> Add("dlPrbusage", box13);
+            obsContainer -> Add("bsStepUeNum",box27);
 
 
 
@@ -707,7 +743,7 @@ namespace ns3 {
 
                 double MappedVelocity;
 
-                if(m_port==1167 || m_port == 1403){
+                if(m_port==1167 || m_port==1168 || m_port == 1403){
                     if(AverageVelocity>=0 && AverageVelocity<=9){
                     MappedVelocity = 0;
                     }
@@ -794,7 +830,7 @@ namespace ns3 {
 
             std::map<uint32_t, double> enbneigborMLBindicator;
             // For Large scale
-            if (m_port == 1167) { 
+            if (m_port == 1167 || m_port == 1168) { 
             for (std::map<uint32_t, Ptr<LteEnbNetDevice>>::iterator iter = m_enbs.begin(); iter !=m_enbs.end(); ++iter){
                 uint32_t CellId = iter->first;
 
@@ -1260,7 +1296,7 @@ namespace ns3 {
 
         // For Joint Q-learning
         ///////////////////////////////////////////
-        if(m_port == 1167 || m_port == 1403){
+        if(m_port == 1167 || m_port == 1403 || m_port == 1168){
             
             uint32_t nodeNum = m_enbs.size();
             
@@ -1277,7 +1313,7 @@ namespace ns3 {
 
                 cell_temp.cellIndividualOffset = cio;
 
-                std::cout<<"Cell "<<i+1<<"  new CIO: "<<int(cio)<<std::endl;
+                std::cout<<"BS "<<i+1<<"  Applied CIO: "<<int(cio)<<std::endl;
 
                 celllist_temp.push_back(cell_temp);
                 
@@ -1306,7 +1342,7 @@ namespace ns3 {
                 double HOM;
                 uint16_t TTT;
 
-                if(m_port == 1165|| m_port == 1166 || m_port == 1167){
+                if(m_port == 1165|| m_port == 1166 || m_port == 1167 || m_port == 1168){
                     HOM = box->GetValue(9 + 1 + 2*cellid);
                     TTT = box->GetValue(9 + 2*cellid);
                 }
@@ -1315,7 +1351,7 @@ namespace ns3 {
                     TTT = box->GetValue(5 + 2*cellid);
                 }
 
-                std::cout<<"Cell "<<cellid<<" HOM: "<<HOM<<" TTT: "<<TTT<<std::endl;
+                std::cout<<"BS "<<cellid+1<<"  Applied HOM: "<<HOM<<" Applied TTT: "<<TTT<<std::endl;
 
                 std::vector<uint64_t> Imsi_List;
 
@@ -1334,7 +1370,7 @@ namespace ns3 {
 
 
                     double mappedVelocity;
-                    if(m_port == 1167 || m_port == 1403){
+                    if(m_port == 1167 || m_port == 1403 || m_port == 1168){
                         if(velocity <=20.0){
                         mappedVelocity = 1.0;
                         }
@@ -1355,6 +1391,8 @@ namespace ns3 {
                     UeActions[2*Imsi_actions+1] = TTT*mappedVelocity;
                 }
             }
+
+            std::cout<<"*********************************************"<<std::endl;
 
             for (std::map<uint64_t, Ptr<LteUeNetDevice>>::iterator iter = m_ues.begin(); iter != m_ues.end(); ++iter)
             {

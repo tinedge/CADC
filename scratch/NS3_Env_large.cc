@@ -248,7 +248,7 @@ main (int argc, char *argv[])
   uint16_t macroEnbBandwidth = 75;
 
   //opengym environment
-  uint32_t openGymPort = 1167;
+  uint32_t openGymPort = 1168;
 
   // change some default attributes so that they are reasonable for
   // this scenario, but do this before processing command line
@@ -1017,7 +1017,7 @@ m11->SetPosition(Vector(400,400,1.6));
   Ptr<RadioBearerStatsCalculator> rlcStats = lteHelper->GetRlcStats (son_server);
   rlcStats->SetAttribute ("EpochDuration", TimeValue (Seconds (1.0)));
 
-  // rlcStats->SetAttribute ("DlRlcOutputFilename", StringValue ("Random_crash_joint_1167.txt"));
+  rlcStats->SetAttribute ("DlRlcOutputFilename", StringValue ("Throughput_Large.txt"));
 
   Ptr<RadioBearerStatsCalculator> pdcpStats = lteHelper->GetPdcpStats ();
   pdcpStats->SetAttribute ("EpochDuration", TimeValue (Seconds (1.0)));

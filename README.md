@@ -1,5 +1,5 @@
 
-SLC2 README
+CADC README
 ================================
 
 ## OS and software preparation:
@@ -13,7 +13,7 @@ This branch contains the entire ns-3 network simulator (ns-3.33) with ns3-gym (o
 1. The first part of the preparation is to clone the repository:
 
 ```shell
-git clone https://github.com/tinedge/SLC2.git
+git clone https://github.com/tinedge/CADC.git
 ```
 
 2. Next, install all dependencies required by ns-3.
@@ -58,14 +58,14 @@ pip3 install --user ./src/opengym/model/ns3gym
 To run small scale scenario, open the terminal and run the command:
 
 ```shell
-chmod +x ./SLC2_small.sh
-./bash SLC2_small.sh
+chmod +x ./CADC_small.sh
+./bash CADC_small.sh
 ```
 
 Note that, you don't have to repeat the following command after your first running.
 
 ```shell
-chmod +x ./SLC2_small.sh
+chmod +x ./CADC_small.sh
 ```
 
 If you want to run only one episode, run the command:
@@ -77,14 +77,14 @@ If you want to run only one episode, run the command:
 To run large scale scenario, open the terminal and run the command:
 
 ```shell
-chmod +x ./SLC2_large.sh
-./bash SLC2_large.sh
+chmod +x ./CADC_large.sh
+./bash CADC_large.sh
 ```
 
 Note that, you don't have to repeat the following command after your first running.
 
 ```shell
-chmod +x ./SLC2_large.sh
+chmod +x ./CADC_large.sh
 ```
 
 If you want to run only one episode, run the command:
@@ -95,20 +95,20 @@ If you want to run only one episode, run the command:
 
 ## Running agent
 
-In the directory scratch, there are SLC2 agent files for small and large scale scenarios.
+In the directory scratch, there are CADC agent files for small and large scale scenarios.
 
 For small scale scenario, open a new terminal and run the command:
 
 ```shell
 cd ./scratch
-python3 SLC2_Agent_small.py
+python3 CADC_Agent_small.py
 ```
 
 For large scale scenario, open a new terminal and run the command:
 
 ```shell
 cd ./scratch
-python3 SLC2_Agent_large.py
+python3 CADC_Agent_large.py
 ```
 
 Contact
@@ -119,7 +119,7 @@ Kihoon Kim, Korea University, rlgns1109@korea.ac.kr
 
 Subin Han, Korea University, subin993@korea.ac.kr
 
-How to reference SLC2?
+How to reference CADC?
 ================================
 Please use the following bibtex:
 

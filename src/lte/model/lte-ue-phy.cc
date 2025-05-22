@@ -45,6 +45,9 @@
 #include <ns3/boolean.h>
 #include <ns3/lte-ue-power-control.h>
 
+#include <iostream>
+#include <fstream>
+
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("LteUePhy");
@@ -1045,9 +1048,6 @@ void
 LteUePhy::ReceiveLteControlMessageList (std::list<Ptr<LteControlMessage> > msgList)
 {
   NS_LOG_FUNCTION (this);
-  // 0.001s period
-  // std::cout<<"Time: "<<Simulator::Now ().GetSeconds()<<std::endl;
-
   std::list<Ptr<LteControlMessage> >::iterator it;
   NS_LOG_DEBUG (this << " I am rnti = " << m_rnti << " and I received msgs " << (uint16_t) msgList.size ());
   for (it = msgList.begin (); it != msgList.end (); it++)
@@ -1764,7 +1764,7 @@ LteUePhy::RlfDetection (double sinrDb)
     if(handovertermok == true){
       handoverterm ++;
       handovertermgo = true;
-      if (handoverterm  == 2000){ 
+      if (handoverterm  == 1000){ // 기훈형이 2000ms로 설정하였는데, 1000ms로 변경하고 새로 진행 (new2)
         handovertermok = false;
         handovertermgo = false;
         handoverterm = 0;
@@ -1789,10 +1789,6 @@ LteUePhy::RlfDetection (double sinrDb)
         pre_PingpongCell = PingpongCell;
         PingpongCell = m_cellId; 
         canpingindex = false;
-        std::cout << "---------------------- " << std::endl;
-        std::cout<<"Time: "<<Simulator::Now().GetSeconds()<<std::endl;
-        std::cout << "Pingpong Occured between " << pre_PingpongCell <<" and "<< m_cellId <<std::endl;
-        std::cout << "---------------------- " << std::endl;
         
           
     }
@@ -1819,23 +1815,21 @@ LteUePhy::RlfDetection (double sinrDb)
     if(lateIndex == false){
       if(Simulator::Now().GetSeconds()>1){ //0627
           ++MRO_TooLateHO_CNT;
-        std::cout<<"Time: "<<Simulator::Now().GetSeconds()<<"*************Too Late Handover Occured at UE "<<m_imsi<<"  in cell "<<m_cellId<<"*************"<<std::endl;
 
-        if(RlfCounter.find(m_cellId) != RlfCounter.end()){
-            RlfCounter[m_cellId] -= 2;
-              PreRlfCounter[m_cellId]-=2;
-              PreRlfCounter[m_PreviousCellId]-=2;
+          if(RlfCounter.find(m_cellId) != RlfCounter.end()){
+              RlfCounter[m_cellId] -= 2;
+                PreRlfCounter[m_cellId]-=2;
+                PreRlfCounter[m_PreviousCellId]-=2;
           }
           else{
-            RlfCounter.insert({m_cellId, -2});
+              RlfCounter.insert({m_cellId, -2});
               PreRlfCounter[m_cellId]-=2;
               PreRlfCounter[m_cellId]-=2;
           }
           
-          lateIndex = true;}
-        } //kihoon 0518
-      // ++MRO_TooLateHO_CNT;
-      // std::cout<<"Time: "<<Simulator::Now().GetSeconds()<<"*************Too Late Handover Occured at UE "<<m_imsi<<"  in cell "<<m_cellId<<"*************"<<std::endl;
+          lateIndex = true;
+        }
+      } //kihoon 0518
     } 
     else if(sinrDb > Threshold_2){
       Insync = true;
@@ -1851,12 +1845,10 @@ LteUePhy::RlfDetection (double sinrDb)
     ReEstablsihmentTimer++;
     if(ReEstablsihmentTimer == 150){ // 100 ms
       RrcRejectNumber ++;
-      // std::cout<<"RRC Reject Number: "<<RrcRejectNumber<<std::endl;
       ReEstablsihmentTimer= 0; 
     }
     if(HandoverOccured == true){
       RrcReestablishmentNumber++;
-      // std::cout<<"RRC ReEstablsihment Number: "<<RrcRejectNumber<<std::endl;
       ReEstablishment = false;
       ReEstablsihmentTimer= 0;
     }
@@ -1872,9 +1864,6 @@ LteUePhy::RlfDetection (double sinrDb)
   // Find Best Cell
   if (m_RlfDetection_Counter == 101) // 200 = 200ms, UE Measurement period 200ms
   { 
-    // std::cout<<"Pointer, SINR : "<<sinrDb<<"  cell id : "<<m_cellId<<std::endl;
-
-    // std::cout<<"Handover Occured: "<<HandoverOccured<<std::endl;
 
     // For MRO state
     /////
@@ -1892,10 +1881,6 @@ LteUePhy::RlfDetection (double sinrDb)
     
     best_rsrp = max_rsrp;
     max_rsrp = -140.0;
-
-    // std::cout<<"UE "<<m_imsi<<std::endl;
-    // std::cout<<"Current RSRP : "<<current_rsrp<<"  Best RSRP: "<<best_rsrp<<std::endl;
-    // /////
 
     if (HandoverOccured == true){
       std::map <uint16_t, UeMeasurementsElement>::iterator it;
@@ -1917,8 +1902,6 @@ LteUePhy::RlfDetection (double sinrDb)
 
       max_rsrp = -140.0;
 
-      // std::cout<<"sinrDb: "<<sinrDb<<std::endl;
-
       // Check Pour SinrDb
       if(sinrDb < Threshold_2){ //Threshold_2 = Q_out_1
         // Check TooEarlyHO
@@ -1928,11 +1911,8 @@ LteUePhy::RlfDetection (double sinrDb)
           if(earlyIndex == false){
             if(Simulator::Now().GetSeconds()>1) {//0627
             ++MRO_TooEarlyHO_CNT;
-            std::cout<<"Time: "<<Simulator::Now().GetSeconds()<<std::endl;
-            std::cout<<"*************Too Early Handover Occured at UE "<<m_imsi<<"*************"<<std::endl;
 
-            // std::cout<<"neighbour cell : "<<m_PreviousCellId<<std::endl;
-
+            
             if (RlfCounter.find(m_PreviousCellId) != RlfCounter.end()){
               RlfCounter[m_PreviousCellId] += 2;
             }
@@ -1949,8 +1929,6 @@ LteUePhy::RlfDetection (double sinrDb)
           if(wrongIndex == false){
             if(Simulator::Now().GetSeconds()>1){ //0627
             ++MRO_WrongCellHO_CNT;
-            std::cout<<"Time: "<<Simulator::Now().GetSeconds()<<std::endl;
-            std::cout<<"*************Wronge Cell Handover Occured at UE "<<m_imsi<<"*************"<<std::endl;
 
             if (RlfCounter.find(max_cellId) != RlfCounter.end()){
               RlfCounter[max_cellId] += 2;

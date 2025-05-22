@@ -937,7 +937,7 @@ BuildingsHelper::Install (ueNodes);
   Ptr<RadioBearerStatsCalculator> rlcStats = lteHelper->GetRlcStats (son_server);
   rlcStats->SetAttribute ("EpochDuration", TimeValue (Seconds (1.0)));
 
-  // rlcStats->SetAttribute ("DlRlcOutputFilename", StringValue ("Random_crash_joint_1403.txt"));
+  rlcStats->SetAttribute ("DlRlcOutputFilename", StringValue ("Throughput_Small.txt"));
 
   Ptr<RadioBearerStatsCalculator> pdcpStats = lteHelper->GetPdcpStats ();
   pdcpStats->SetAttribute ("EpochDuration", TimeValue (Seconds (1.0)));
