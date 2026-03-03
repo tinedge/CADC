@@ -149,4 +149,6 @@ How to reference CADC?
 ================================
 Please use the following bibtex:
 
+Eunsok Lee, Subin Han, Kihoon Kim, and Sangheon Pack, "Conflict-Aware Distributed Coordination Framework for Self-Organizing Networks," _IEEE Transactions on Mobile Computing_, Early Access.
+
 <blank>
